@@ -1,0 +1,98 @@
+# Day 01
+
+## What I learned
+
+### Homebrew
+
+Homebrew is a package manager for macOS that allows developers to install software through the terminal.
+
+---
+
+### Python
+
+Python is the interpreter that executes my Python code.
+
+VS Code is only an editor.
+
+The Python Extension connects VS Code with the Python interpreter.
+
+---
+
+### VS Code
+
+VS Code is my primary code editor.
+
+Useful extensions installed:
+
+- Python
+- Pylance
+- GitLens
+- Error Lens
+- Material Icon Theme
+- Jupyter
+
+---
+
+### Database Design
+
+I learned that before creating tables, we should first identify the business entities.
+
+Example:
+
+- Customer
+- Product
+- Order
+- Payment
+
+---
+
+### Entity vs Attribute
+
+Entity
+
+- Customer
+- Product
+- Order
+
+Attribute
+
+- Phone Number
+- Address
+- Price
+- Status
+
+---
+
+### Primary Key
+
+A unique identifier of a record.
+
+Example:
+
+CustomerID
+
+---
+
+### Foreign Key
+
+A column that references another table.
+
+Example:
+
+Orders.CustomerID
+
+---
+
+### Why use JOIN?
+
+Instead of storing customer information repeatedly inside the Orders table, we only store the CustomerID and retrieve the customer details using a JOIN.
+
+This reduces data redundancy and keeps the database normalized.
+
+---
+
+## Biggest realization today
+
+Before today, I thought database design was about creating tables.
+
+Now I understand that database design starts with understanding the business first.
