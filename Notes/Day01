@@ -62,40 +62,36 @@ Attribute
 - Status
 
 ---
-
-### Primary Key
-
-A unique identifier of a record.
-
-Example:
-
-CustomerID
-
+Primary key, unique to for the data 
+Foreign key, reference data to for relational. Like icoconnect mo yung isang table sa isa pang table kagaya nung customer at order table. 
+index - ginagamit to para madaling mahanap yung specific data na kailangan makita. 
+usually nilalagay ito sa mga very selective columns para nang sa ganon ay 
+very specific lang ang irereturn na data. 
+sequential scan - iniscan nya ang table sequentially. 
+Like sunod sunod mula 1 to etc. 
+Nalaman ko na rin yung pagkakaiba ng entities at attributes. 
+yung join medyo palang kasi may background na rin ako dyan pero di pa ganon kahusay. 
+So far, nabuild ko yung curiosity ko at naging mas interesado pang matuto. 
+And yung mindset ko ngayon ay nagiging mas firm at malalim na ang pag iisip.
+Pag may nakita akong query ay mas naiisip ko na kung pano ang execution plan nya. 
+Ano yung pagdadaanan nya muna bago nya makita yung hinahanap at nagiging mas 
+curious ako kung para saan ba yung query na yun. Tapos sa pagcreate din ng database 
+ay hindi agad create database name, dapat ibuild muna ang structure manually kahit sa papel lang or notes.
 ---
 
-### Foreign Key
+### New word for me
+-Sequential scan - scan lahat sequentially
+-Index - nagpapabilis dahil inaallow nya ang engine to scan specifilly
+-selectivity - example customerId, very selective sya kasi bawat isa ay may pagkakakilanlan at madaling gamitin for locator ng data
 
-A column that references another table.
+----
+## Biggest Realization
 
-Example:
-
-Orders.CustomerID
-
----
-
-### Why use JOIN?
-
-Instead of storing customer information repeatedly inside the Orders table, we only store the CustomerID and retrieve the customer details using a JOIN.
-
-This reduces data redundancy and keeps the database normalized.
-
----
-
-## Biggest realization today
-
-Before today, I thought database design was about creating tables.
-
-Now I understand that database design starts with understanding the business first.
+- SQL is just a language. The real skill is understanding how the database thinks.
+- Before writing SQL, I should understand the business requirements first.
+- Database design starts with planning the entities and relationships, not by immediately creating tables.
+- I should start asking "Why?" instead of memorizing syntax.
+-----
 
 ## Questions I still have
 
@@ -103,3 +99,12 @@ Now I understand that database design starts with understanding the business fir
 - Ano ang normalization?
 - Paano gumagana ang JOIN internally?
 - Bakit may snapshot data?
+
+- Paano ba talaga gumagana ang B-Tree?
+- Paano ginagawa ni PostgreSQL ang Index?
+- Saan talaga naka-store ang database sa MacBook?
+- Paano nagde-decide ang Query Planner kung Index Scan o Sequential Scan ang gagamitin?
+
+I'm gonna find it out on Day 2. 
+
+Thank you for reading this notes and supporting my journey. 
