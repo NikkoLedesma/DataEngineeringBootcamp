@@ -96,3 +96,10 @@ This reduces data redundancy and keeps the database normalized.
 Before today, I thought database design was about creating tables.
 
 Now I understand that database design starts with understanding the business first.
+
+## Questions I still have
+
+- Kailan dapat hiwalay ang Flavor table? (this is for the JC Barley Database)
+- Ano ang normalization?
+- Paano gumagana ang JOIN internally?
+- Bakit may snapshot data?
