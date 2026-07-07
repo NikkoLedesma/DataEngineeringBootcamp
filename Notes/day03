@@ -1,1 +1,55 @@
+Welcome to Day 3 of my journey to become Data Engineer
 
+### Realization
+Query Planner is only as good as its statistics.
+Statistics do not execute the query.
+Statistics influence the planner's decision.
+
+### ANALYZE
+
+Purpose:
+Hindi nito ino-optimize ang query.
+Hindi nito ginagawa ang index.
+Hindi nito binibilang ang buong table sa bawat query.
+Ang ginagawa nito ay:
+Ina-update nito ang statistics na ginagamit ng Query Planner para makapili ng mas tamang execution plan.
+
+### Mabagal ang query
+Workflow
+User:
+"Ang bagal ng query."
+
+        │
+        ▼
+
+Run EXPLAIN ANALYZE
+
+        │
+        ▼
+
+Check Execution Plan
+
+        │
+        ▼
+
+Check Estimates vs Actual Rows
+
+        │
+        ▼
+
+Check Statistics
+
+        │
+        ▼
+
+Is ANALYZE needed?
+
+        │
+        ▼
+
+Need ba talaga ng bagong index?
+
+        │
+        ▼
+
+Kung kailangan lang saka mag-add ng index.
