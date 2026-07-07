@@ -1,0 +1,255 @@
+Day 2 of my journey to be Data Engineer.
+
+### PostgreSQL Query Flow
+-- Unang natutunan ko na ang PostgreSQL ay hindi agad nag-eexecute ng query.
+-- Eto ang flow,
+  SQL Query - Sample SELECT * customer FROM customerid = 1
+      ↓
+  Query Planner
+        ↓
+  Compare Execution Plans
+        ↓
+  Choose Lowest Estimated Cost
+        ↓
+  Query Executor
+        ↓
+  Return Result
+
+### Query planner
+    Ang purpose ng query planner ay ito ang nagdedecide ng kung anong pinakamurang paraan para i-execute ang query
+    Hindi lang siya basta naghahanap ng Index. Kino-compare nya ang mga execution scan katulad ng Seq Scan, Index scan,
+    Bitmap Heap Scan at marami pang iba.
+
+### Sequential Scan
+    Definition:
+    Binabasa ang buong table mula umpisa hanggang dulo.
+    Usually ginagamit kapag:
+    Maliit ang table
+    Karamihan ng rows ang kailangan
+    Mas mura kaysa Index Scan
+
+### Index Scan
+    Definition:
+    Ginagamit kapag very selective ang hinahanap.
+    Example:
+
+    SELECT *
+    FROM customer
+    WHERE customerid = 10;
+
+    Usually ginagamit sa:
+    
+    Primary Keys
+    Unique Columns
+    Highly Selective Columns
+### Bitmap Heap Scan
+    
+    Ito ang bagong scan type na lumabas noong nagkaroon tayo ng 100,000 rows.
+    
+    Flow:
+    
+    Bitmap Index Scan
+            ↓
+    Collect matching row locations
+            ↓
+    Bitmap Heap Scan
+            ↓
+    Read actual rows from the table
+    
+    Ginagamit kapag:
+    
+    Maraming matching rows
+    Hindi efficient ang normal Index Scan
+    Hindi rin efficient ang Sequential Scan
+### Selectivity
+    
+    Isa ito sa pinakamahalagang concept.
+    
+    Hindi porke may index ay gagamitin na agad.
+    
+    Ang Query Planner ay titingin kung gaano ka-selective ang query.
+    
+    Examples
+    
+    Very Selective
+    
+    WHERE customerid = 1
+    
+    Not Selective
+    
+    SELECT *
+    FROM customer;
+    
+    Medium Selective
+    
+    WHERE lastname = 'Lastname50'
+### Statistics
+    
+    Nalaman ko na may sariling statistics ang PostgreSQL.
+    
+    Ginagamit ito ng Query Planner para mag-estimate ng:
+    
+    Total Rows
+    Expected Returned Rows
+    Estimated Cost
+    
+    Hindi niya binibilang ang rows bawat query.
+    
+    May sarili siyang stored statistics.
+    
+### EXPLAIN
+    
+    Purpose:
+    
+    Hindi nito ini-execute ang query.
+    
+    Ipinapakita lang kung ano ang execution plan na balak gamitin ni PostgreSQL.
+    
+    Example:
+    
+    EXPLAIN
+    SELECT *
+    FROM customer
+    WHERE customerid = 1;
+### EXPLAIN ANALYZE
+    
+    Purpose:
+    
+    Ini-execute ang query.
+    
+    Pinapakita ang:
+    
+    Actual Execution Plan
+    Estimated Cost
+    Actual Rows
+    Planning Time
+    Execution Time
+    
+    Example:
+    
+    EXPLAIN ANALYZE
+    SELECT *
+    FROM customer
+    WHERE lastname='Lastname50';
+### Reading Execution Plans
+    
+    Example
+    
+    Bitmap Heap Scan
+        ↓
+    Bitmap Index Scan
+    
+    Interpretation
+    
+    Una:
+    
+    Hanapin ang matching rows gamit ang index.
+    
+    Pangalawa:
+    
+    Basahin ang actual rows mula sa table.
+    
+### Estimated Cost
+    
+    Hindi ito actual time.
+    
+    Ginagamit lamang ito ng Query Planner para mag-compare ng iba't ibang execution plans.
+    
+    Lowest Estimated Cost
+    
+    ↓
+    
+    Chosen Plan
+    
+### Planning Time vs Execution Time
+    
+    Planning Time
+    
+    Pag-decide ng Query Planner
+    Compare execution plans
+    Compute estimated cost
+    
+    Execution Time
+    
+    Actual execution
+    Actual reading ng data
+### Primary Key
+    
+    Automatically creates an index.
+    
+    Example:
+    
+    customerid SERIAL PRIMARY KEY
+    
+    Automatic na nag-create si PostgreSQL ng:
+    
+    customer_pkey
+### Commands Learned
+    
+    Create Table
+    
+    CREATE TABLE customer (...);
+    
+    Insert Data
+    
+    INSERT INTO customer (...);
+    
+    Select
+    
+    SELECT * FROM customer;
+    
+    Specific Row
+    
+    SELECT *
+    FROM customer
+    WHERE customerid = 1;
+    
+    Count Rows
+    
+    SELECT COUNT(*)
+    FROM customer;
+    
+    Generate Test Data
+    
+    INSERT INTO customer (...)
+    SELECT ...
+    FROM generate_series(...);
+    
+    Show Table Structure
+    
+    \d customer
+    
+    Show Indexes
+    
+    \di
+    
+    Execution Plan
+    
+    EXPLAIN
+    
+    Execute + Analyze
+    
+    EXPLAIN ANALYZE
+### Engineering Mindset Learned
+    
+    Bago magsulat ng query, isipin muna:
+    
+    Selective ba ang query?
+    Ilang rows ang expected na babalik?
+    Ano ang possible execution plan?
+    Ano kaya ang pinakamababang estimated cost?
+
+### Biggest Lessons
+    ✅ Hindi lahat ng query ay gumagamit ng Index.    
+    ✅ Hindi porke may index ay gagamitin agad ito.    
+    ✅ Ang Query Planner ang nagde-decide.    
+    ✅ Ang planner ay gumagamit ng statistics.    
+    ✅ Ang planner ang pumipili ng execution plan na may pinakamababang estimated cost.   
+    ✅ Mahalaga ang EXPLAIN ANALYZE sa pag-investigate ng performance.
+    
+### Personal Reflection
+    
+    Ngayon, hindi na ako tumitingin sa SQL query bilang simpleng command lang. Iniisip ko na rin ang magiging proseso nito sa loob ng PostgreSQL. 
+    Bago maibalik ang data, dadaan muna ito sa Query Planner, magco-compare ng iba't ibang execution plans, 
+    at pipili ng may pinakamababang estimated cost. Natutunan ko rin na ang performance ay hindi lang nakadepende sa pagkakaroon ng index, 
+    kundi sa selectivity ng query, statistics ng database, at sa desisyon ng Query Planner.
