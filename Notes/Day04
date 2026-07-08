@@ -1,0 +1,331 @@
+Welcome to Day 4 of my journey to become Data Engineer
+
+Day 4 – Transactions, Locks at Isolation
+1. Row-Level Lock
+Natutunan
+
+Kapag nag-UPDATE ang isang transaction, hindi nito nilo-lock ang buong table.
+
+Yung specific row lang ang nilo-lock.
+
+Example:
+
+BEGIN;
+
+UPDATE customer
+SET lastname = 'Ledesma'
+WHERE customerid = 1;
+
+Habang hindi pa nagco-COMMIT:
+
+CustomerID = 1 → 🔒 Locked
+CustomerID = 2 → Available
+CustomerID = 3 → Available
+Bakit?
+
+Para makapagtrabaho pa rin ang ibang users sa ibang rows.
+
+2. UPDATE vs UPDATE
+
+Scenario
+
+User A
+
+UPDATE customer
+SET lastname='Ledesma'
+WHERE customerid=1;
+
+Habang hindi pa committed...
+
+User B
+
+UPDATE customer
+SET lastname='Santos'
+WHERE customerid=1;
+Result
+
+Hindi papayagan ni PostgreSQL.
+
+Maghihintay si User B hanggang matapos ang transaction ni User A.
+
+3. SELECT vs UPDATE (MVCC)
+
+Ito ang isa sa pinakamahalagang lesson.
+
+Scenario
+
+User A
+
+BEGIN;
+
+UPDATE customer
+SET lastname='Ledesma'
+WHERE customerid=1;
+
+Hindi pa committed.
+
+User B
+
+SELECT *
+FROM customer;
+Result
+
+Makikita pa rin ni User B ang old version.
+
+Hindi siya maghihintay.
+
+Ito ang isa sa pinakamalaking benepisyo ng MVCC.
+
+4. Read Your Own Writes
+
+Ito ang concept na una kong itinama sa'yo.
+
+Scenario
+
+User A
+
+BEGIN;
+
+UPDATE customer
+SET lastname='Ledesma'
+WHERE customerid=1;
+
+Pagkatapos...
+
+SELECT *
+FROM customer;
+Result
+
+Makikita ni User A ang:
+
+Ledesma
+
+Hindi ang old version.
+
+Rule
+
+A transaction always sees its own changes, even before COMMIT.
+
+Samantalang ang ibang transactions ay old version pa rin ang makikita hanggang mag-COMMIT.
+
+5. Execute vs Commit
+
+Ito ang biggest realization mo.
+
+Execute
+
+Ang command ay tumakbo na.
+
+Visible na siya sa loob ng sariling transaction.
+
+Commit
+
+Dito lang magiging visible ang changes sa ibang transactions.
+
+Simple visualization
+
+BEGIN
+
+↓
+
+UPDATE (executed)
+
+↓
+
+User A sees new value
+
+↓
+
+User B still sees old value
+
+↓
+
+COMMIT
+
+↓
+
+Everyone now sees new value
+6. Deadlock
+
+Ito ang bagong concept ngayon.
+
+Scenario
+
+User A
+
+Lock Row 1
+
+↓
+
+Needs Row 2
+
+User B
+
+Lock Row 2
+
+↓
+
+Needs Row 1
+
+Result
+
+A waits for B
+
+↓
+
+B waits for A
+
+Wala nang uusad.
+
+Ito ang Deadlock.
+
+7. Deadlock Detection
+
+Hindi naghihintay habambuhay si PostgreSQL.
+
+Kapag nakita niyang may circular waiting:
+
+A → waiting kay B
+
+↓
+
+B → waiting kay A
+
+Magro-roll back siya ng isang transaction.
+
+Tatanggal ang lock.
+
+Makakatuloy ang kabilang transaction.
+
+8. Isolation Levels (Introduction)
+
+Ito ang pinakaunang topic natin dito.
+
+Scenario
+
+User A
+
+SELECT Balance
+
+↓
+
+10000
+
+User B
+
+UPDATE
+
+↓
+
+5000
+
+↓
+
+COMMIT
+
+Question
+
+Ano ang makikita ni User A kapag nag-SELECT ulit?
+
+Dito natin nalaman na ang sagot ay depende sa isolation level.
+
+9. READ COMMITTED
+
+Default isolation level ng PostgreSQL.
+
+Behavior
+
+Bawat bagong SQL statement ay kumukuha ng bagong snapshot.
+
+Example
+
+SELECT #1
+
+↓
+
+10000
+
+UPDATE ng ibang user
+
+↓
+
+COMMIT
+
+SELECT #2
+
+↓
+
+5000
+
+10. REPEATABLE READ
+
+Behavior
+
+Isang snapshot lang ang ginagamit mula umpisa hanggang matapos ang transaction.
+
+Example
+
+SELECT #1
+
+↓
+
+10000
+
+UPDATE ng ibang user
+
+↓
+
+COMMIT
+
+SELECT #2
+
+↓
+
+10000 pa rin
+
+Ito ang ideal para sa reporting.
+
+11. Business Reasoning
+
+Isa ito sa pinaka-importanteng realization mo.
+
+Hindi dapat pabago-bago ang data habang gumagawa ng financial report.
+
+Mas mahalaga ang consistency ng report kaysa real-time updates.
+
+Kaya sa reporting systems, malaking tulong ang isang stable snapshot.
+
+🧠 Mga Vocabulary na Nadagdag
+Row-Level Lock – Lock sa isang specific row lamang.
+Lock – Pansamantalang pag-reserve ng access sa data habang may transaction.
+Deadlock – Dalawang o higit pang transactions ang naghihintayan sa isa't isa.
+Deadlock Detector – Mekanismo ni PostgreSQL na nakakakita ng circular waiting at nagro-roll back ng isang transaction.
+Execute – Naitakbo ang SQL command sa loob ng kasalukuyang transaction.
+Commit – Ginagawang permanent at visible sa ibang transactions ang mga pagbabago.
+Read Your Own Writes – Nakikita ng transaction ang sarili nitong updates kahit hindi pa committed.
+Isolation Level – Rules kung paano at kailan nakakakita ang isang transaction ng changes mula sa ibang transactions.
+READ COMMITTED – Bawat statement ay gumagamit ng bagong snapshot.
+REPEATABLE READ – Isang snapshot lang ang ginagamit sa buong transaction.
+🎯 Biggest Lesson of Day 4
+
+Hindi tungkol sa syntax ang natutunan natin.
+
+Natutunan natin ang paano pinoprotektahan ng PostgreSQL ang data habang libo-libong users ang sabay-sabay na gumagamit ng database.
+
+Sa pagtatapos ng Day 4, naiintindihan mo na ang flow na ito:
+
+BEGIN
+    ↓
+Execute Query
+    ↓
+Query acquires locks (kung kailangan)
+    ↓
+MVCC determines visibility
+    ↓
+Other users continue working safely
+    ↓
+COMMIT or ROLLBACK
+    ↓
+Locks are released
+    ↓
+VACUUM eventually cleans obsolete row versions
