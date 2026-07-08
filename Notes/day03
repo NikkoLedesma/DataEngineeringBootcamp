@@ -53,3 +53,21 @@ Need ba talaga ng bagong index?
         ▼
 
 Kung kailangan lang saka mag-add ng index.
+
+
+### ACID Transactions
+A = Atomicity 
+        – Tinitiyak na ang lahat ng operations sa loob ng isang transaction ay matatapos nang buo (COMMIT) 
+        o walang mangyayaring pagbabago (ROLLBACK) kapag may kahit isang operation na nag-fail. 
+        Walang partial changes na maiiwan sa database.
+        ATOMIC - ALL OR NOTHING
+
+### Final question for this day 
+
+Bakit hindi na lang i-overwrite ni PostgreSQL ang existing row kapag may UPDATE?
+
+Tama dahil MVCC. Dahil kapag nagoverwrite ka lang ng existing row ay maaring masira ang transaction na binabasa ng iba. 
+Imagine or isipin palagi na di lang isa ang nagbabasa sa isang transaction kaya may mvcc, dahil sa concurrency. 
+Dahil dito ay naiiwasan masira ang binabasa ng ibang gumagamit o nagbabasa. Dahil sa mvcc, 
+kapag may inupdate ka ay gagawa ito ng version sa end ng nag update at di masisira ang transaction ng kasabay nito
+        
