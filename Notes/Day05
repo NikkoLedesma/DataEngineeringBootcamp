@@ -1,0 +1,343 @@
+Welcome to Day 5 of my journey to become Data Engineer
+
+Day 5 – Performance Tuning Fundamentals
+
+Theme: Think like a Database Engineer
+
+Objective
+
+Hindi matutunan kung paano gumawa ng index.
+
+Ang objective ng Day 5 ay matutunan ang tamang proseso ng pag-diagnose ng performance problems bago mag-optimize.
+
+1. Performance Tuning starts with Evidence
+
+Kapag may report na:
+
+"Mabagal ang query."
+
+HINDI agad:
+
+gumawa ng index
+mag-VACUUM
+mag-ANALYZE
+baguhin ang query
+
+Unang step:
+
+EXPLAIN ANALYZE
+
+Ito ang source of truth.
+
+2. Explain Analyze is the First Tool
+
+Hindi tayo nag-aassume.
+
+Tinatanong muna natin:
+
+Anong scan ang ginamit?
+Bakit iyon ang pinili?
+Accurate ba ang planner?
+Accurate ba ang statistics?
+Execution time?
+Planning time?
+3. Index is NOT Always the Answer
+
+Malaking realization ng Day 5.
+
+Hindi porke mabagal ay kailangan ng index.
+
+Example:
+
+SELECT *
+FROM customer;
+
+Kung lahat ng rows ang kailangan,
+
+kahit may index,
+
+Seq Scan pa rin ang pinakamurang option.
+
+4. Explain Analyze Before Creating Index
+
+Rule:
+
+Slow Query
+
+↓
+
+EXPLAIN ANALYZE
+
+↓
+
+Understand the execution plan
+
+↓
+
+Find the root cause
+
+↓
+
+Only then optimize
+
+Hindi baliktad.
+
+5. Statistics First
+
+Isa sa unang chinecheck kapag mabagal ang query:
+
+Updated ba ang statistics?
+
+Examples:
+
+n_live_tup
+ANALYZE
+
+Kapag outdated ang statistics,
+
+puwedeng mali ang planner.
+
+6. Scenario #1
+
+Situation:
+
+100,000,000 rows
+
+↓
+
+Estimated Rows = 2,400,000
+
+↓
+
+Actual Rows = 2,500,000
+
+↓
+
+Index Scan
+
+↓
+
+Execution = 15 seconds
+
+Observation:
+
+Statistics are accurate.
+
+Planner is accurate.
+
+Index Scan is reasonable.
+
+Question:
+
+Bakit mabagal pa rin?
+
+7. Biggest Realization
+
+Hindi lahat ng Index Scan ay mabilis.
+
+Kapag milyon-milyon ang matching rows,
+
+mahal pa rin ang execution.
+
+Reason:
+
+Index Scan pattern
+
+Index
+
+↓
+
+Pointer
+
+↓
+
+Heap
+
+↓
+
+Pointer
+
+↓
+
+Heap
+
+↓
+
+Pointer
+
+↓
+
+Heap
+
+Millions of pointer lookups become expensive.
+
+8. Bitmap Heap Scan Connection
+
+Ito ang naging realization natin.
+
+Kapag maraming matching rows,
+
+ordinary Index Scan becomes expensive.
+
+Possible solution ng planner:
+
+Bitmap Heap Scan
+
+Instead of
+
+Index
+
+↓
+
+Heap
+
+↓
+
+Index
+
+↓
+
+Heap
+
+↓
+
+Index
+
+↓
+
+Heap
+
+Planner first collects matching locations.
+
+After that,
+
+reads heap pages efficiently.
+
+Mas organized.
+
+Mas kaunting random access.
+
+9. Three Questions Before Optimizing
+
+Always ask:
+
+How many rows exist?
+
+How many rows will be returned?
+
+Which scan has the lowest cost?
+
+Hindi:
+
+"May index ba?"
+
+10. Production Thinking
+
+Unti-unti nating binago ang mindset.
+
+Old mindset:
+
+Slow
+
+↓
+
+Create Index
+
+New mindset:
+
+Slow Query
+
+↓
+
+Evidence
+
+↓
+
+Explain Analyze
+
+↓
+
+Execution Plan
+
+↓
+
+Statistics
+
+↓
+
+Root Cause
+
+↓
+
+Optimization
+
+↓
+
+Measure Again
+
+Optimization is NOT Step 1.
+
+Optimization is almost the last step.
+
+11. Production Incident – Lock Investigation
+
+Scenario:
+
+Application freezes every 10–15 minutes.
+
+CPU
+
+✔ Normal
+
+RAM
+
+✔ Normal
+
+Disk
+
+✔ Normal
+
+Queries
+
+✔ Fast
+
+Observation:
+
+Problem is NOT slow execution.
+
+Possible hypothesis:
+
+Transactions are waiting for locks.
+
+Important realization:
+
+Lock Waiting ≠ Deadlock
+
+Lock Waiting
+
+Isang transaction ang may hawak ng lock.
+Iba ay naghihintay.
+Kapag nag-commit ang unang transaction, tuloy ang iba.
+
+Deadlock
+
+Dalawa o higit pang transactions ang naghihintayan.
+Walang makakausad.
+Kailangan nang mamagitan ang PostgreSQL at mag-rollback ng isa.
+12. Biggest Mindset Improvement
+
+Noong Day 1,
+
+ang tanong ko ay:
+
+"What scan is this?"
+
+Ngayon,
+
+ang tanong ko ay:
+
+"Why did PostgreSQL choose this scan?"
+
+Hindi na ako naghahanap ng tamang scan.
+
+Hinahanap ko na ang pinakamababang execution cost.
