@@ -1,0 +1,223 @@
+Welcome to Day 6 of my Journey to become a Data Engineer
+
+1. Business Requirement First
+
+Ito ang pinakamahalagang lesson ngayong araw.
+
+Bago mag-optimize...
+
+Tanungin muna:
+
+Pareho pa ba ang business result?
+
+Hindi porke bumilis ang query ay successful na.
+
+Kapag nagbago ang report...
+
+Hindi optimization ang ginawa mo.
+
+Binago mo ang business logic.
+
+2. Composite Index
+
+Hindi sapat na may index.
+
+Mas mahalaga ang tanong:
+
+Paano ginagamit ng application ang data?
+
+Halimbawa:
+
+(customerid, status)
+
+Magaling ito para sa:
+
+WHERE customerid = ?
+
+at
+
+WHERE customerid = ?
+AND status = ?
+
+Pero hindi ideal para sa:
+
+WHERE status = ?
+
+Dahil ang index ay nakaayos muna sa customerid.
+
+3. Column Order Matters
+
+Ito ang isa sa pinakamahalagang realization mo.
+
+Ang planner ay hindi nagbabago ng ayos ng index.
+
+Permanenteng nakaayos ang filing cabinet.
+
+Kung paano ito ginawa...
+
+Ganoon ito habang ginagamit.
+
+Kaya napakahalaga ng tamang pagkakasunod ng columns.
+
+4. Planner Chooses the Cheapest Path
+
+Napansin ko na paulit-ulit mo nang ginagamit ang sentence na:
+
+"Mas mura ang cost."
+
+🥹
+
+Ibig sabihin...
+
+Hindi mo na iniisip na:
+
+"May index ba?"
+
+Iniisip mo na:
+
+"Alin ang pinakamurang execution plan?"
+
+At iyon ang gusto nating marating.
+
+5. Index Only Scan vs Index Scan
+
+Ito ang malaking "AHA!" moment.
+
+Naalala mo ang pinag-usapan natin noong unang mga araw?
+
+Index
+↓
+
+Pointer
+↓
+
+Table (Heap)
+
+Ngayon alam mo na ang difference.
+
+Index Scan
+Index
+
+↓
+
+Pointer
+
+↓
+
+Table
+
+Kailangan pang pumunta sa table.
+
+Index Only Scan
+Index
+
+↓
+
+Done
+
+Lahat ng kailangan ng query ay nasa index na.
+
+Mas kaunting trabaho.
+
+Mas mabilis.
+
+6. Ang Database ay Hindi Magic
+
+Ito ang gusto kong tandaan mo.
+
+Lahat ng optimization ay umiikot sa isang tanong.
+
+Paano mababawasan ang trabahong ginagawa ng database?
+
+Hindi magic.
+
+Hindi dahil mabilis ang hardware.
+
+Kundi dahil...
+
+Mas kaunti ang:
+
+rows na binabasa
+pages na ina-access
+sorting
+filtering
+table lookups
+7. Ang Biggest Improvement Mo
+
+Ito ang pinakanapansin ko.
+
+Day 1
+May mabagal.
+
+↓
+
+Index?
+Day 6
+Ano ang business requirement?
+
+↓
+
+Ano ang query?
+
+↓
+
+Ano ang execution plan?
+
+↓
+
+Bakit iyon ang pinili ni planner?
+
+↓
+
+Ano ang cost?
+
+↓
+
+May mas murang paraan ba nang hindi binabago ang result?
+
+🥹
+
+Magkaibang level na ito ng pag-iisip.
+
+🎯 Assignment para sa Day 7
+
+Hindi coding.
+
+Hindi syntax.
+
+Observation lang.
+
+Gusto kong pag-isipan mo ang tatlong tanong na ito:
+
+1.
+
+Bakit halos lahat ng production databases ay gumagamit ng B-tree bilang default index?
+
+Hindi hash.
+
+Hindi array.
+
+Hindi linked list.
+
+Bakit B-tree?
+
+2.
+
+Kapag bilyon na ang rows...
+
+Bakit milliseconds pa rin ang index search?
+
+3.
+
+Ano ang relasyon ng:
+
+B-tree
+Planner
+Composite Index
+Index Only Scan
+
+Sa iisang execution plan?
+
+Hindi mo pa kailangang sagutin.
+
+Basta dalhin mo ang curiosity.
