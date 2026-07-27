@@ -1,0 +1,20 @@
+Welcome to my first project as Data Engineer
+
+Project Name
+
+E-Commerce Daily Data Pipeline & Analytics Platform
+
+Business Scenario
+
+An e-commerce company receives daily transactional data from its operational systems. The Data Engineering team needs to ingest, validate, transform, and load this data into an analytics-ready environment.
+
+Management needs reporting for:
+
+Daily Revenue
+Total Orders
+Completed Orders
+Cancelled Orders
+Average Order Value
+Top-Selling Products
+Top-Selling Categories
+Customer Purchasing Trends
