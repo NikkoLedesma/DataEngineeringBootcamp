@@ -1,1 +1,183 @@
 Welcome to Day 7 of my Journey to become a Data Engineer
+
+
+🚀 DAY 7 — B-TREE INTERNALS
+🎯 Goal
+
+Today's goal was to understand how PostgreSQL retrieves data internally. Instead of focusing on SQL syntax, I wanted to understand what happens after executing a query and how indexes actually work.
+
+My Biggest Realization
+
+Before today, I thought indexes simply made queries faster.
+
+Now I understand that an index is actually a separate data structure that helps PostgreSQL locate rows without scanning the entire table.
+
+The database still needs to retrieve the actual row from the table.
+
+The index only tells PostgreSQL where to find it.
+
+Understanding B-Tree
+
+A B-Tree is the default index structure used by PostgreSQL.
+
+Instead of searching every row sequentially, PostgreSQL navigates through different levels of the tree until it reaches the correct leaf page.
+
+Conceptually it works like this:
+
+Root Page
+      │
+      ▼
+Intermediate Pages
+      │
+      ▼
+Leaf Pages
+      │
+      ▼
+Heap (Actual Table Row)
+
+The index does not contain the complete row.
+
+It stores searchable values together with pointers to the actual table rows.
+
+Planner vs Executor
+
+One thing I learned today is that PostgreSQL has two major stages before returning data.
+
+Planner
+
+The planner decides the most efficient execution plan.
+
+Examples:
+
+Sequential Scan
+Index Scan
+Bitmap Heap Scan
+
+The planner makes this decision based on statistics.
+
+Executor
+
+After the planner chooses the plan, the executor performs the actual work.
+
+It follows the execution plan and retrieves the requested rows.
+
+Importance of Statistics
+
+One of the biggest things I learned today is that PostgreSQL depends heavily on statistics.
+
+If statistics become outdated, the planner may choose a poor execution plan even if indexes already exist.
+
+Possible solution:
+
+ANALYZE;
+
+ANALYZE updates the planner's statistics.
+
+It does not reorganize the physical table.
+
+Correlation
+
+Today I learned what correlation means inside PostgreSQL.
+
+Correlation measures how closely the physical order of rows matches the order of an index.
+
+High correlation means nearby index entries usually point to nearby table pages.
+
+Low correlation means rows are scattered across many pages.
+
+Lower correlation can increase random disk access and reduce query performance.
+
+CLUSTER
+
+One solution for low correlation is:
+
+CLUSTER;
+
+Unlike ANALYZE,
+
+CLUSTER physically reorganizes the table based on an index.
+
+This improves physical locality and can improve future index scans.
+
+VACUUM
+
+I also learned about dead tuples.
+
+When rows are updated or deleted, PostgreSQL does not immediately remove the old versions.
+
+These become dead tuples.
+
+Running:
+
+VACUUM;
+
+helps clean these dead tuples and recover reusable space.
+
+Production Mindset
+
+Today I realized that performance tuning is not simply about adding indexes.
+
+Before making changes, a Data Engineer should understand why a query became slow.
+
+Examples:
+
+Large Difference Between Estimated Rows and Actual Rows
+
+Possible cause:
+
+Outdated statistics
+
+Possible action:
+
+ANALYZE;
+Low Correlation
+
+Possible cause:
+
+Rows are physically scattered.
+
+Possible action:
+
+CLUSTER;
+Large Number of Dead Tuples
+
+Possible cause:
+
+Many updates or deletes.
+
+Possible action:
+
+VACUUM;
+Buffer Cache
+
+Another realization today was understanding that PostgreSQL does not always read directly from disk.
+
+Frequently accessed pages are stored in shared buffers.
+
+If the requested page is already in memory, PostgreSQL can avoid expensive disk reads.
+
+My Production Thinking
+
+Today I stopped thinking:
+
+"How do I make this query faster?"
+
+Instead, I started asking:
+
+"Why did PostgreSQL choose this execution plan?"
+
+Understanding the planner is much more valuable than memorizing SQL syntax.
+
+Biggest Lesson Today
+
+Today wasn't about learning another SQL command.
+
+It was about understanding how PostgreSQL thinks before executing a query.
+
+I realized that becoming a Data Engineer is not just writing SQL.
+
+It is understanding how the database makes decisions so I can make better optimization choices.
+
+Next Goal
+
+After understanding how PostgreSQL retrieves data internally, the next step is to apply this knowledge by building my first end-to-end ETL pipeline using Python, Pandas, psycopg, and PostgreSQL.
