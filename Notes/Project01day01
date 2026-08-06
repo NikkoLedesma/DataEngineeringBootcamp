@@ -1,20 +1,279 @@
 Welcome to my first project as Data Engineer
 
-Project Name
+🚀 Project 1 — E-Commerce Daily Data Pipeline & Analytics Platform
+🎯 Business Scenario
 
-E-Commerce Daily Data Pipeline & Analytics Platform
+This is my first end-to-end Data Engineering project.
 
-Business Scenario
+The business scenario is an e-commerce company that receives transactional data every day from its operational systems. Instead of directly using these files for reporting, the Data Engineering team is responsible for building a reliable pipeline that ingests, validates, transforms, and loads the data into an analytics-ready environment.
 
-An e-commerce company receives daily transactional data from its operational systems. The Data Engineering team needs to ingest, validate, transform, and load this data into an analytics-ready environment.
-
-Management needs reporting for:
+The goal is to support business reporting such as:
 
 Daily Revenue
 Total Orders
 Completed Orders
 Cancelled Orders
-Average Order Value
+Average Order Value (AOV)
 Top-Selling Products
 Top-Selling Categories
 Customer Purchasing Trends
+🎯 Project Goal
+
+Hindi lang gumawa ng Python script.
+
+The real goal is to simulate how a real Data Engineering team builds a production-ready ETL pipeline.
+
+Instead of focusing on dashboards first, the priority is making sure that the data is complete, validated, and trusted before it reaches the analytics layer.
+
+What I Learned Before Writing Any Code
+
+Isa sa pinakamalaking realization ko bago pa kami magsimula mag-code is that Data Engineering is more about designing the flow of data than writing Python.
+
+Before this project, akala ko enough na ang magkaroon ng database at tables.
+
+Pero sa real-world production, may iba't ibang layers pala ang data.
+
+Database Architecture
+
+Created a dedicated PostgreSQL database.
+
+ecommerce_dw
+
+Then created four schemas.
+
+raw
+staging
+warehouse
+analytics
+My understanding
+
+Mas madali ko siyang naiintindihan gamit itong analogy.
+
+Building
+│
+├── Database
+│
+├── Schemas (Filing Cabinets)
+│
+├── Tables (Folders)
+│
+└── Rows (Papers)
+Purpose of Every Schema
+Raw
+
+Ito ang unang destination ng lahat ng incoming files.
+
+No validation.
+
+No transformation.
+
+Store the data exactly as it was received.
+
+Parang evidence room.
+
+Ayaw muna naming baguhin ang original data.
+
+Staging
+
+Dito magsisimula ang actual Data Engineering work.
+
+Examples:
+
+Validate data
+Clean invalid records
+Standardize values
+Remove duplicates
+Apply business rules
+Warehouse
+
+This layer contains trusted and business-ready data.
+
+Ito na ang magiging source ng dashboards at reports.
+
+Analytics
+
+This layer contains business metrics, KPIs, and reporting tables.
+
+Ito na ang directly ginagamit ng management.
+
+Raw Tables
+
+Created three raw tables.
+
+raw.orders
+
+raw.order_items
+
+raw.payments
+
+Each table also stores operational metadata.
+
+source_file
+
+ingested_at
+
+batch_id
+My Biggest Realization About Metadata
+
+At first, akala ko unnecessary lang sila.
+
+Pero habang ginagawa namin yung pipeline, na-realize ko na hindi sila business data.
+
+They are operational metadata.
+
+These fields help Data Engineers answer questions like:
+
+Saan nanggaling ang data?
+Kailan ito na-process?
+Anong pipeline execution ang nag-load nito?
+
+Business Time is not equal to Pipeline Time.
+
+Example:
+
+created_at
+
+Business Event
+
+↓
+
+ingested_at
+
+Pipeline Processing Time
+
+Python Pipeline
+
+Built three ingestion pipelines.
+
+load_raw_orders.py
+
+load_raw_order_items.py
+
+load_raw_payments.py
+
+Napansin ko rin na halos pare-pareho lang ang structure nila.
+
+Only the business columns change.
+
+Common ETL Pattern
+
+Every ingestion script follows the same production pattern.
+
+Configuration
+
+↓
+
+Validate File
+
+↓
+
+Read CSV
+
+↓
+
+Validate Columns
+
+↓
+
+Generate Metadata
+
+↓
+
+Convert Data
+
+↓
+
+Bulk Insert
+
+↓
+
+Success Message
+
+This made me realize that production pipelines are designed to be reusable and consistent.
+
+Defensive Programming
+
+Before reading the CSV, the pipeline first validates that the file exists.
+
+Instead of allowing multiple downstream errors, the pipeline immediately stops.
+
+One lesson I learned:
+
+The earlier I detect the problem, the easier it is to debug.
+
+Configuration
+
+Instead of hardcoding values throughout the script, all configurable values are placed at the top.
+
+Examples:
+
+CSV Path
+Database Configuration
+Source File
+Batch ID
+
+This makes the pipeline easier to maintain.
+
+Bulk Loading
+
+Instead of inserting one row at a time, I prepared the records first before sending them to PostgreSQL.
+
+This approach is cleaner and much closer to how production pipelines handle large datasets.
+
+Project Progress
+
+Current architecture.
+
+CSV Files
+        │
+        ▼
+Python ETL
+        │
+        ▼
+PostgreSQL Raw Layer
+
+Successfully completed:
+
+✅ Orders
+
+✅ Order Items
+
+✅ Payments
+
+Biggest Mindset Shift
+
+Before this project, I thought Data Engineering was mostly about Python.
+
+After building the Raw Layer, I realized that Python is only a tool.
+
+The real responsibility of a Data Engineer is making sure that data moves through the pipeline correctly, consistently, and reliably.
+
+Hindi pala enough na "gumagana."
+
+Kailangan maintindihan kung bakit ganito ang design ng pipeline.
+
+Next Goal
+
+Now that the Raw Layer is complete, the next step is to build the Staging Layer.
+
+This is where the actual transformation begins.
+
+Topics to learn:
+
+Data Validation
+Data Cleansing
+Standardization
+Deduplication
+Business Rules
+Preparing trusted data for the Warehouse
+Personal Reflection
+
+Ito na yung first project na feeling ko parang totoong ginagawa sa industry.
+
+Hindi lang ako natutong gumawa ng Python script.
+
+Mas naintindihan ko kung bakit may Raw, Staging, Warehouse, at Analytics layers at bakit hindi pwedeng dumiretso ang CSV files sa reporting.
+
+Unti-unti ko nang nababago yung mindset ko mula sa "Paano ko ito gagawin?" papunta sa "Bakit ganito ang design ng production pipeline?"
+
+Sa tingin ko, ito ang pinakamahalagang lesson na nakuha ko bago pa man kami magsimula sa actual data transformations.
