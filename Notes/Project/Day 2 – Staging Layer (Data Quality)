@@ -1,1 +1,1095 @@
+🚀 PROJECT 1 — DAY 2
+Staging Layer: Data Validation, Cleansing, Deduplication & Reconciliation
+Project
 
+E-Commerce Daily Data Pipeline & Analytics Platform
+
+🎯 Day 2 Goal
+
+After completing the Raw Layer, the goal for Day 2 was to make sure that only clean, valid, and trusted records can move forward to the Warehouse.
+
+Our pipeline became:
+
+CSV
+ ↓
+RAW
+ ↓
+Profiling
+ ↓
+Validation
+ ↓
+┌─────────────────┬─────────────────────┐
+│ Valid Records   │ Invalid Records     │
+↓                 ↓
+staging.*         staging.*_rejected
+ ↓
+Cross-table Reconciliation
+ ↓
+Ready for Warehouse
+
+The biggest lesson for me today was:
+
+A Data Engineer does not just move data. A Data Engineer protects data quality.
+
+1. Creating the Staging Tables
+
+For every important dataset, we created two tables:
+
+Valid table
+Rejected / quarantine table
+
+Instead of deleting bad data, we preserve it with a reason why it failed.
+
+ORDERS
+Valid Orders Table
+CREATE TABLE staging.orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    status VARCHAR(20),
+    total_amount NUMERIC(12,2),
+    created_at TIMESTAMPTZ,
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT
+);
+Simple Explanation
+CREATE TABLE staging.orders (
+
+Creates a new table named orders inside the staging schema.
+
+order_id INT PRIMARY KEY,
+
+Stores the unique ID of each order.
+
+PRIMARY KEY means duplicate order_ids are not allowed inside the valid staging table.
+
+customer_id INT,
+
+Identifies which customer placed the order.
+
+order_date DATE,
+
+Stores the business date when the order happened.
+
+status VARCHAR(20),
+
+Stores statuses such as:
+
+completed
+cancelled
+pending
+total_amount NUMERIC(12,2),
+
+Stores the total monetary value of the order.
+
+created_at TIMESTAMPTZ,
+
+Stores when the source system created the record.
+
+source_file VARCHAR(255),
+
+Keeps the filename where the record came from.
+
+This helps with data lineage.
+
+ingested_at TIMESTAMPTZ,
+
+Stores when our pipeline loaded the record.
+
+batch_id INT
+
+Identifies which ingestion batch processed the record.
+
+Rejected Orders Table
+CREATE TABLE staging.orders_rejected (
+    order_id INT,
+    customer_id INT,
+    order_date DATE,
+    status VARCHAR(20),
+    total_amount NUMERIC(12,2),
+    created_at TIMESTAMPTZ,
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT,
+    rejection_reason TEXT,
+    rejected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+Most columns are the same as staging.orders.
+
+But we added:
+
+rejection_reason TEXT,
+
+Stores why the record was rejected.
+
+Example:
+
+Duplicate order_id
+Missing customer_id
+Negative total_amount
+Invalid status
+
+And:
+
+rejected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+
+Automatically records when the pipeline rejected the row.
+
+2. Data Profiling
+
+Before cleaning data, we inspected the condition of the Raw Layer first.
+
+This is important because:
+
+Profile first. Transform second.
+
+For orders, we ran:
+
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT order_id) AS distinct_order_ids,
+    COUNT(*) FILTER (WHERE order_id IS NULL) AS missing_order_id,
+    COUNT(*) FILTER (WHERE customer_id IS NULL) AS missing_customer_id,
+    COUNT(*) FILTER (WHERE total_amount IS NULL) AS missing_amount,
+    COUNT(*) FILTER (WHERE total_amount < 0) AS negative_amount,
+    COUNT(*) FILTER (WHERE order_date > CURRENT_DATE) AS future_order_date
+FROM raw.orders;
+Explanation
+COUNT(*) AS total_rows
+
+Counts all records.
+
+Our result:
+
+10
+COUNT(DISTINCT order_id)
+
+Counts unique orders.
+
+Our result:
+
+5
+
+This immediately showed us something suspicious.
+
+10 rows
+5 unique orders
+
+Meaning records were duplicated.
+
+COUNT(*) FILTER (WHERE order_id IS NULL)
+
+Counts orders with missing order_id.
+
+COUNT(*) FILTER (WHERE customer_id IS NULL)
+
+Checks missing customers.
+
+COUNT(*) FILTER (WHERE total_amount IS NULL)
+
+Checks orders with no amount.
+
+COUNT(*) FILTER (WHERE total_amount < 0)
+
+Checks impossible/suspicious negative order totals.
+
+COUNT(*) FILTER (
+    WHERE order_date > CURRENT_DATE
+)
+
+Checks orders dated in the future.
+
+3. Checking Order Status Values
+
+We ran:
+
+SELECT
+    status,
+    COUNT(*) AS row_count
+FROM raw.orders
+GROUP BY status
+ORDER BY status;
+
+Result:
+
+cancelled   2
+completed   6
+pending     2
+
+This allowed us to see the actual status values arriving from the source.
+
+Instead of blindly assuming what statuses exist, we inspect first.
+
+4. Duplicate Detection
+SELECT
+    order_id,
+    COUNT(*) AS occurrence_count
+FROM raw.orders
+GROUP BY order_id
+HAVING COUNT(*) > 1
+ORDER BY order_id;
+Explanation
+GROUP BY order_id
+
+Groups records belonging to the same order.
+
+COUNT(*)
+
+Counts how many copies each order has.
+
+HAVING COUNT(*) > 1
+
+Only returns orders appearing more than once.
+
+Result:
+
+1001 → 2
+1002 → 2
+1003 → 2
+1004 → 2
+1005 → 2
+
+Every order had been loaded twice.
+
+5. Checking Whether They Were Exact Duplicates
+
+We then ran:
+
+SELECT
+    order_id,
+    COUNT(*) AS total_rows,
+    COUNT(
+        DISTINCT (
+            customer_id,
+            order_date,
+            status,
+            total_amount,
+            created_at,
+            source_file,
+            batch_id
+        )
+    ) AS distinct_versions
+FROM raw.orders
+GROUP BY order_id
+ORDER BY order_id;
+
+We got:
+
+total_rows = 2
+distinct_versions = 1
+
+for every order.
+
+Meaning:
+
+Same business record talaga. Na-ingest lang dalawang beses.
+
+This gave us our first real duplicate ingestion problem.
+
+6. Deduplication Using ROW_NUMBER()
+
+To keep only one valid copy, we used:
+
+ROW_NUMBER() OVER (
+    PARTITION BY order_id
+    ORDER BY ingested_at ASC
+)
+
+Example:
+
+order_id | ingested_at | row_num
+---------+-------------+--------
+1001     | first load  | 1
+1001     | second load | 2
+
+Meaning:
+
+row_num = 1
+
+Keep.
+
+row_num > 1
+
+Duplicate.
+
+Quarantine.
+
+7. Loading Valid Orders
+BEGIN;
+
+Starts a transaction.
+
+We want all staging operations to behave as one logical unit.
+
+DELETE FROM staging.orders
+WHERE batch_id = 20260727;
+
+Removes the previous staging result for this batch.
+
+This allows our current learning pipeline to be rerun without repeatedly duplicating staging results.
+
+DELETE FROM staging.orders_rejected
+WHERE batch_id = 20260727;
+
+Same idea for rejected records.
+
+Then:
+
+WITH ranked_orders AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY order_id
+            ORDER BY ingested_at ASC
+        ) AS row_num
+    FROM raw.orders
+    WHERE batch_id = 20260727
+)
+Explanation
+WITH ranked_orders AS
+
+Creates a CTE — Common Table Expression.
+
+Think of it as a temporary result we can use inside the query.
+
+SELECT *
+
+Gets all raw order columns.
+
+ROW_NUMBER()
+
+Assigns a number to each duplicate.
+
+PARTITION BY order_id
+
+Starts the numbering separately for each order.
+
+ORDER BY ingested_at ASC
+
+Oldest ingestion becomes number 1.
+
+Then:
+
+INSERT INTO staging.orders (
+    order_id,
+    customer_id,
+    order_date,
+    status,
+    total_amount,
+    created_at,
+    source_file,
+    ingested_at,
+    batch_id
+)
+
+Tells PostgreSQL where valid records should be inserted.
+
+SELECT
+    order_id,
+    customer_id,
+    order_date,
+    LOWER(TRIM(status)),
+    total_amount,
+    created_at,
+    source_file,
+    ingested_at,
+    batch_id
+FROM ranked_orders
+
+Notice:
+
+LOWER(TRIM(status))
+
+This performs standardization.
+
+For example:
+
+" COMPLETED "
+"Completed"
+"COMPLETED"
+
+become:
+
+completed
+
+TRIM() removes extra spaces.
+
+LOWER() converts text to lowercase.
+
+Then our validation rules:
+
+WHERE row_num = 1
+
+Only keeps the first copy.
+
+AND order_id IS NOT NULL
+
+Order must have an ID.
+
+AND customer_id IS NOT NULL
+
+Must have a customer.
+
+AND total_amount IS NOT NULL
+
+Must have an amount.
+
+AND total_amount >= 0
+
+Reject negative order totals.
+
+AND order_date IS NOT NULL
+
+Order must have a date.
+
+AND order_date <= CURRENT_DATE
+
+Reject future orders.
+
+AND LOWER(TRIM(status)) IN (
+    'completed',
+    'cancelled',
+    'pending'
+)
+
+Only accepts recognized order statuses.
+
+8. Quarantining Rejected Orders
+
+Invalid records were inserted into:
+
+staging.orders_rejected
+
+We used:
+
+CONCAT_WS(
+    '; ',
+    ...
+)
+
+CONCAT_WS combines multiple rejection reasons.
+
+For example, one row could theoretically have:
+
+Missing customer_id; Negative total_amount; Invalid status
+
+instead of storing only one problem.
+
+Example condition:
+
+CASE
+    WHEN row_num > 1
+    THEN 'Duplicate order_id'
+END
+
+If the row is the second copy of an order, assign:
+
+Duplicate order_id
+
+Another:
+
+CASE
+    WHEN total_amount < 0
+    THEN 'Negative total_amount'
+END
+
+Another:
+
+CASE
+    WHEN order_date > CURRENT_DATE
+    THEN 'Future order_date'
+END
+
+Finally:
+
+COMMIT;
+
+Makes the transaction permanent.
+
+Result for Orders
+
+We ended with:
+
+Raw orders        = 10
+Valid orders      = 5
+Rejected orders   = 5
+
+Rejected records were the duplicate copies.
+
+No data was lost.
+
+9. Order Items Profiling
+
+Next we profiled:
+
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT order_item_id) AS distinct_order_item_ids,
+    COUNT(*) FILTER (WHERE order_item_id IS NULL) AS missing_order_item_id,
+    COUNT(*) FILTER (WHERE order_id IS NULL) AS missing_order_id,
+    COUNT(*) FILTER (WHERE product_id IS NULL) AS missing_product_id,
+    COUNT(*) FILTER (WHERE quantity IS NULL) AS missing_quantity,
+    COUNT(*) FILTER (WHERE quantity <= 0) AS invalid_quantity,
+    COUNT(*) FILTER (WHERE unit_price IS NULL) AS missing_unit_price,
+    COUNT(*) FILTER (WHERE unit_price < 0) AS negative_unit_price
+FROM raw.order_items;
+
+Result:
+
+6 total rows
+6 unique order_item_ids
+0 missing IDs
+0 invalid quantities
+0 missing prices
+0 negative prices
+Duplicate Order Item Check
+SELECT
+    order_item_id,
+    COUNT(*) AS occurrence_count
+FROM raw.order_items
+GROUP BY order_item_id
+HAVING COUNT(*) > 1
+ORDER BY order_item_id;
+
+Result:
+
+0 duplicate rows
+10. Referential Integrity Check
+
+We checked whether every order item belongs to a valid order.
+
+SELECT
+    oi.order_item_id,
+    oi.order_id
+FROM raw.order_items oi
+LEFT JOIN staging.orders o
+    ON oi.order_id = o.order_id
+WHERE o.order_id IS NULL;
+Explanation
+FROM raw.order_items oi
+
+Starts with order items.
+
+oi is just an alias.
+
+LEFT JOIN staging.orders o
+
+Tries to find the corresponding valid order.
+
+ON oi.order_id = o.order_id
+
+Matches them using order_id.
+
+WHERE o.order_id IS NULL
+
+Returns items where no valid parent order exists.
+
+These are called:
+
+Orphan records
+
+Our result:
+
+0 orphan records
+11. Order Items Staging Tables
+
+We created:
+
+CREATE TABLE staging.order_items (
+    order_item_id INT PRIMARY KEY,
+    order_id INT,
+    product_id INT,
+    quantity INT,
+    unit_price NUMERIC(12,2),
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT
+);
+
+And:
+
+CREATE TABLE staging.order_items_rejected (
+    order_item_id INT,
+    order_id INT,
+    product_id INT,
+    quantity INT,
+    unit_price NUMERIC(12,2),
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT,
+    rejection_reason TEXT,
+    rejected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+Order Item Validation Rules
+
+Valid records required:
+
+order_item_id IS NOT NULL
+order_id IS NOT NULL
+product_id IS NOT NULL
+quantity IS NOT NULL
+quantity > 0
+unit_price IS NOT NULL
+unit_price >= 0
+
+We also used:
+
+EXISTS (
+    SELECT 1
+    FROM staging.orders o
+    WHERE o.order_id = ri.order_id
+)
+What does EXISTS mean?
+
+Basically asks:
+
+“Does a matching valid order exist?”
+
+SELECT 1 does not mean we need the number 1.
+
+We only care whether PostgreSQL can find a matching row.
+
+Result
+Valid order items    = 6
+Rejected order items = 0
+12. Payments Profiling
+
+For payments:
+
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT payment_id) AS distinct_payment_ids,
+    COUNT(*) FILTER (
+        WHERE payment_id IS NULL
+    ) AS missing_payment_id,
+    COUNT(*) FILTER (
+        WHERE order_id IS NULL
+    ) AS missing_order_id,
+    COUNT(*) FILTER (
+        WHERE payment_date IS NULL
+    ) AS missing_payment_date,
+    COUNT(*) FILTER (
+        WHERE payment_method IS NULL
+    ) AS missing_payment_method,
+    COUNT(*) FILTER (
+        WHERE amount IS NULL
+    ) AS missing_amount,
+    COUNT(*) FILTER (
+        WHERE amount < 0
+    ) AS negative_amount,
+    COUNT(*) FILTER (
+        WHERE status IS NULL
+    ) AS missing_status,
+    COUNT(*) FILTER (
+        WHERE payment_date > CURRENT_DATE
+    ) AS future_payment_date
+FROM raw.payments;
+
+Result:
+
+5 total payments
+5 unique payment IDs
+0 missing fields
+0 negative amounts
+0 future payment dates
+Payment Status Profiling
+SELECT
+    status,
+    COUNT(*) AS row_count
+FROM raw.payments
+GROUP BY status
+ORDER BY status;
+
+Result:
+
+completed = 3
+failed    = 1
+pending   = 1
+Payment Method Profiling
+SELECT
+    payment_method,
+    COUNT(*) AS row_count
+FROM raw.payments
+GROUP BY payment_method
+ORDER BY payment_method;
+
+Result:
+
+bank_transfer
+cash_on_delivery
+credit_card
+gcash
+13. Payments Staging
+
+We created:
+
+CREATE TABLE staging.payments (
+    payment_id INT PRIMARY KEY,
+    order_id INT,
+    payment_date DATE,
+    payment_method VARCHAR(50),
+    amount NUMERIC(12,2),
+    status VARCHAR(20),
+    created_at TIMESTAMPTZ,
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT
+);
+
+And:
+
+CREATE TABLE staging.payments_rejected (
+    payment_id INT,
+    order_id INT,
+    payment_date DATE,
+    payment_method VARCHAR(50),
+    amount NUMERIC(12,2),
+    status VARCHAR(20),
+    created_at TIMESTAMPTZ,
+    source_file VARCHAR(255),
+    ingested_at TIMESTAMPTZ,
+    batch_id INT,
+    rejection_reason TEXT,
+    rejected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+Payment Validation
+
+Accepted statuses:
+
+LOWER(TRIM(status)) IN (
+    'completed',
+    'failed',
+    'pending'
+)
+
+Accepted payment methods:
+
+LOWER(TRIM(payment_method)) IN (
+    'bank_transfer',
+    'cash_on_delivery',
+    'credit_card',
+    'gcash'
+)
+
+Other important checks:
+
+payment_id IS NOT NULL
+order_id IS NOT NULL
+payment_date IS NOT NULL
+payment_date <= CURRENT_DATE
+amount IS NOT NULL
+amount >= 0
+created_at IS NOT NULL
+
+And again:
+
+EXISTS (
+    SELECT 1
+    FROM staging.orders o
+    WHERE o.order_id = rp.order_id
+)
+
+This makes sure the payment belongs to an existing valid order.
+
+Result:
+
+Valid payments    = 5
+Rejected payments = 0
+14. Cross-Table Reconciliation
+
+This was probably the most important part of Day 2.
+
+Even if each table is individually valid, they can still disagree.
+
+Example:
+
+orders.total_amount = 500
+
+order_items total = 450
+
+Both numbers are individually valid.
+
+But together:
+
+MISMATCH
+
+So we reconciled them.
+
+Item Totals CTE
+WITH item_totals AS (
+    SELECT
+        order_id,
+        SUM(quantity * unit_price) AS calculated_item_total
+    FROM staging.order_items
+    GROUP BY order_id
+),
+Explanation
+quantity * unit_price
+
+Calculates each line item's value.
+
+Example:
+
+2 × ₱150 = ₱300
+
+Then:
+
+SUM(...)
+
+Adds all line items belonging to the same order.
+
+Payment Summary CTE
+payment_summary AS (
+    SELECT
+        order_id,
+
+        SUM(amount) FILTER (
+            WHERE status = 'completed'
+        ) AS completed_payment_amount,
+
+        COUNT(*) FILTER (
+            WHERE status = 'completed'
+        ) AS completed_payment_count,
+
+        STRING_AGG(
+            DISTINCT status,
+            ', '
+            ORDER BY status
+        ) AS payment_statuses
+
+    FROM staging.payments
+    GROUP BY order_id
+)
+Explanation
+SUM(amount) FILTER (
+    WHERE status = 'completed'
+)
+
+Adds only successful payment amounts.
+
+COUNT(*) FILTER (
+    WHERE status = 'completed'
+)
+
+Counts completed payments.
+
+STRING_AGG(...)
+
+Combines multiple statuses into one readable value if needed.
+
+Example:
+
+completed, refunded
+Final Reconciliation Query
+SELECT
+    o.order_id,
+    o.status AS order_status,
+    o.total_amount AS order_total,
+    i.calculated_item_total,
+
+Gets the order information and calculated item total.
+
+Then:
+
+CASE
+    WHEN o.total_amount = i.calculated_item_total
+    THEN 'MATCH'
+    ELSE 'MISMATCH'
+END AS order_vs_items,
+
+Compares:
+
+Order total
+vs
+Sum of order items
+
+Then:
+
+p.completed_payment_amount,
+p.payment_statuses,
+
+Adds payment information.
+
+Then:
+
+CASE
+    WHEN o.status = 'completed'
+         AND p.completed_payment_count > 0
+         AND o.total_amount = p.completed_payment_amount
+    THEN 'MATCH'
+
+    WHEN o.status = 'completed'
+    THEN 'MISMATCH'
+
+    ELSE 'NOT_APPLICABLE'
+END AS completed_order_vs_payment
+
+If the order says completed, we expect:
+
+completed payment exists
++
+payment amount matches order amount
+
+Otherwise:
+
+MISMATCH
+
+For pending or cancelled orders, we used:
+
+NOT_APPLICABLE
+
+because we did not want to invent business rules that were never given.
+
+Our Final Reconciliation Result
+1001 | completed | ₱500  | items ₱500  | MATCH | payment ₱500  | MATCH
+1002 | completed | ₱750  | items ₱750  | MATCH | payment ₱750  | MATCH
+1003 | cancelled | ₱300  | items ₱300  | MATCH | failed        | N/A
+1004 | completed | ₱1200 | items ₱1200 | MATCH | payment ₱1200 | MATCH
+1005 | pending   | ₱450  | items ₱450  | MATCH | pending       | N/A
+
+So:
+
+✅ All valid staging records passed cross-table reconciliation.
+
+Final Day 2 Pipeline
+RAW
+│
+├── raw.orders
+│      ↓
+│   Profile
+│      ↓
+│   Validate
+│      ↓
+│   Deduplicate
+│      ↓
+│   ├── staging.orders
+│   └── staging.orders_rejected
+│
+├── raw.order_items
+│      ↓
+│   Validate
+│      ↓
+│   Referential Integrity
+│      ↓
+│   ├── staging.order_items
+│   └── staging.order_items_rejected
+│
+└── raw.payments
+       ↓
+    Validate
+       ↓
+    Referential Integrity
+       ↓
+    ├── staging.payments
+    └── staging.payments_rejected
+
+              ↓
+     CROSS-TABLE RECONCILIATION
+
+orders.total_amount
+        =
+SUM(order_items.quantity × unit_price)
+
+Completed Order
+        =
+Completed Payment Amount
+
+              ↓
+           PASSED ✅
+🧠 Concepts I Learned on Day 2
+
+Data Profiling — inspect the condition of incoming data before transforming it.
+
+Validation — decide whether values are acceptable.
+
+Standardization — convert inconsistent formatting into one format using things like LOWER() and TRIM().
+
+Deduplication — remove duplicate business records while preserving one canonical copy.
+
+Quarantine / Reject Handling — preserve bad records instead of deleting them.
+
+CTE (WITH) — create temporary query results that make complex SQL easier to understand.
+
+ROW_NUMBER() — rank records and identify duplicates.
+
+Window Functions — calculate values across related rows without collapsing them like normal GROUP BY.
+
+Referential Integrity — make sure child records belong to valid parent records.
+
+EXISTS — efficiently check whether a related record exists.
+
+Cross-table Reconciliation — make sure multiple datasets agree with each other.
+
+Transactions (BEGIN / COMMIT) — treat multiple database operations as one controlled unit.
+
+💡 Biggest Day 2 Realization
+
+Before this project, “cleaning data” sounded like:
+
+Remove NULL
+Fix spelling
+Remove duplicates
+
+But now I understand that real Data Engineering is more structured.
+
+We need to ask:
+
+Is the data complete?
+Is it valid?
+Is it consistent?
+Does it make business sense?
+Does it agree with related datasets?
+Can we trace rejected records?
+Can we safely rerun the pipeline?
+
+The biggest real-world issue we discovered was something we didn't intentionally create:
+
+raw.orders = 10 rows
+unique orders = 5
+
+The Orders ingestion had been executed twice.
+
+Instead of simply deleting the duplicates, the Staging Layer identified them, kept one valid copy, and quarantined the additional copies.
+
+That made the lesson much more realistic because it demonstrated why idempotency, deduplication, lineage, and reject handling matter in production pipelines.
+
+✅ DAY 2 STATUS
+Orders
+├── Profiling ✅
+├── Validation ✅
+├── Standardization ✅
+├── Deduplication ✅
+└── Reject Handling ✅
+
+Order Items
+├── Profiling ✅
+├── Validation ✅
+├── Referential Integrity ✅
+└── Reject Handling ✅
+
+Payments
+├── Profiling ✅
+├── Validation ✅
+├── Referential Integrity ✅
+└── Reject Handling ✅
+
+Cross-Table Data Quality
+├── Orders vs Items ✅
+├── Completed Orders vs Payments ✅
+└── Reconciliation Passed ✅
+Final architecture after Day 2
+SOURCE CSV
+    ↓
+RAW LAYER
+    ↓
+STAGING LAYER
+    ↓
+Valid + Standardized + Deduplicated
+    ↓
+Cross-table Reconciliation
+    ↓
+TRUSTED DATA
+    ↓
+DAY 3: WAREHOUSE LAYER
